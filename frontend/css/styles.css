@@ -305,6 +305,8 @@ body {
 .badge[data-c="Mistake"]    { background: var(--c-mistake);    color:#2a1806; }
 .badge[data-c="Blunder"]    { background: var(--c-blunder);    color:#2a0603; }
 .ply.active .badge { box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+/* icon glyphs (e.g. the Book icon) scale with the badge */
+.badge svg, .review-badge svg { width: 70%; height: 70%; display: block; }
 
 /* ---------------- board overlay cues (cm-chessboard) ---------------- */
 .cm-chessboard .arrow-best .arrow-head { fill: var(--c-best); fill-rule: nonzero; }

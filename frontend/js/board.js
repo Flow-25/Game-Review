@@ -12,6 +12,14 @@ const ASSETS = "https://cdn.jsdelivr.net/npm/cm-chessboard@8/assets/";
 const DOT = MARKER_TYPE.dot;                 // legal-move hint dots
 const ARROW_EVAL = { class: "arrow-eval" };  // engine arrow in analysis mode
 
+// Open-book icon for "Book" moves (inherits the badge text colour via currentColor).
+export const BOOK_ICON_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M12 7v13"/>' +
+  '<path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>' +
+  "</svg>";
+
 // Glyph shown in the corner badge per classification.
 const GLYPH = {
   Brilliant: "!!", Great: "!", Best: "★", Excellent: "✓", Good: "✓",
@@ -158,7 +166,8 @@ export class ReviewBoard {
     b.className = "review-badge";
     b.dataset.c = cls;
     b.dataset.square = square;
-    b.textContent = GLYPH[cls] ?? "";
+    if (cls === "Book") b.innerHTML = BOOK_ICON_SVG;
+    else b.textContent = GLYPH[cls] ?? "";
     b.title = cls;
     this.overlay.appendChild(b);
     this._placeBadge(b);

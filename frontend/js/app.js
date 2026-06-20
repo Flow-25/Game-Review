@@ -1,7 +1,7 @@
 // App orchestration: analyze → load game → navigate moves with cues + eval bar.
 
 import { getApiBase, setApiBase, analyze, getGame, getMove, getProgress, evaluate } from "./api.js";
-import { ReviewBoard, FEN } from "./board.js";
+import { ReviewBoard, FEN, BOOK_ICON_SVG } from "./board.js";
 import { Chess } from "chess.js";
 
 const SAMPLE_PGN = `[White "Paul Morphy"]
@@ -85,7 +85,8 @@ function badge(cls) {
   const b = document.createElement("span");
   b.className = "badge";
   b.dataset.c = cls;
-  b.textContent = BADGE[cls] ?? "";
+  if (cls === "Book") b.innerHTML = BOOK_ICON_SVG;
+  else b.textContent = BADGE[cls] ?? "";
   b.title = cls;
   return b;
 }
