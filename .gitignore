@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Analysis output
+*.json
+!frontend/**/*.json
+!backend/data/openings.json
+output/
+
+# Bundled engine binary (large; download via README instructions)
+engines/

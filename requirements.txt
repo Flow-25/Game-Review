@@ -1,0 +1,8 @@
+# Core backend dependencies for Phase 1
+# NOTE: the PyPI package is named "chess" (the old "python-chess" name is a
+# deprecated alias). It still imports as `import chess`.
+chess>=1.11
+
+# Phase 2: backend web API
+fastapi>=0.115
+uvicorn[standard]>=0.30

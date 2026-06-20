@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chess Game Review</title>
+
+  <!-- UI font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- cm-chessboard core + extension styles (CDN) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cm-chessboard@8/assets/chessboard.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cm-chessboard@8/assets/extensions/markers/markers.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cm-chessboard@8/assets/extensions/arrows/arrows.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- Resolve cm-chessboard bare imports to the CDN -->
+  <script type="importmap">
+  {
+    "imports": {
+      "cm-chessboard/": "https://cdn.jsdelivr.net/npm/cm-chessboard@8/",
+      "chess.js": "https://cdn.jsdelivr.net/npm/chess.js@1/dist/esm/chess.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__mark">♞</span>
+      <span class="brand__name">Game Review</span>
+    </div>
+    <div class="topbar__controls">
+      <input id="api-base" class="api-input" title="Backend API base URL" />
+      <button id="load-sample" class="btn btn--ghost" type="button">Load sample</button>
+      <button id="open-pgn" class="btn btn--ghost" type="button">Paste PGN</button>
+      <button id="analyze" class="btn btn--primary" type="button">Analyze</button>
+      <button id="analysis-toggle" class="btn" type="button" title="Interactive self-analysis — drag pieces">⚄ Analysis</button>
+    </div>
+  </header>
+
+  <!-- analysis progress bar -->
+  <div id="progress" class="progress hidden" role="progressbar" aria-label="Review progress">
+    <div id="progress-fill" class="progress__fill"></div>
+  </div>
+
+  <!-- PGN entry drawer -->
+  <section id="pgn-drawer" class="pgn-drawer hidden">
+    <textarea id="pgn-input" class="pgn-input" spellcheck="false"
+      placeholder="Paste a PGN here…"></textarea>
+    <div class="pgn-drawer__row">
+      <label>Time/move (s)
+        <input id="time-input" type="number" min="0.05" max="2" step="0.05" value="0.1" />
+      </label>
+      <label class="checkbox">
+        <input id="brilliant-input" type="checkbox" checked /> Detect brilliancies
+      </label>
+      <span class="grow"></span>
+      <button id="analyze-2" class="btn btn--primary" type="button">Analyze game</button>
+    </div>
+  </section>
+
+  <main class="layout">
+    <!-- LEFT: eval bar + board + controls -->
+    <section class="board-pane">
+      <div class="board-row">
+        <div id="eval-bar" class="eval-bar" title="Evaluation">
+          <div id="eval-white" class="eval-bar__white"></div>
+          <span id="eval-label" class="eval-bar__label">0.0</span>
+        </div>
+        <div class="board-stack">
+          <div id="board" class="board"></div>
+          <div id="board-overlay" class="board-overlay"></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="nav-start" class="btn nav" title="Start (Home)">⏮</button>
+        <button id="nav-prev"  class="btn nav" title="Previous (←)">◀</button>
+        <button id="nav-next"  class="btn nav" title="Next (→)">▶</button>
+        <button id="nav-end"   class="btn nav" title="End (End)">⏭</button>
+        <button id="flip"      class="btn nav" title="Flip board">⇅</button>
+      </div>
+
+      <div id="analysis-bar" class="analysis-bar hidden">
+        <div class="analysis-bar__row">
+          <span id="analysis-turn" class="analysis-turn">White to move</span>
+          <span class="grow"></span>
+          <button id="an-undo" class="btn" type="button" title="Take back (←)">⟲ Undo</button>
+          <button id="an-reset" class="btn" type="button" title="Back to entry position">⌂ Reset</button>
+          <button id="an-exit" class="btn btn--primary" type="button">Exit analysis</button>
+        </div>
+        <div class="analysis-bar__row">
+          <input id="an-fen" class="an-fen" spellcheck="false" placeholder="Paste a FEN to evaluate…" />
+          <button id="an-loadfen" class="btn" type="button">Load FEN</button>
+        </div>
+        <div id="analysis-lines" class="analysis-lines"></div>
+      </div>
+
+      <div id="move-info" class="move-info">
+        <span class="move-info__hint">Analyze a game, or hit <b>Analysis</b> to drag pieces and evaluate any position.</span>
+      </div>
+    </section>
+
+    <!-- RIGHT: players, accuracy, move list -->
+    <aside class="side-pane">
+      <div id="players" class="players">
+        <div class="player player--black">
+          <span class="avatar">♚</span>
+          <div class="player__meta">
+            <span class="pname" id="name-black">Black</span>
+            <span class="acpl" id="acpl-black"></span>
+          </div>
+          <span class="accuracy is-empty" id="acc-black"></span>
+        </div>
+        <div class="player player--white">
+          <span class="avatar">♔</span>
+          <div class="player__meta">
+            <span class="pname" id="name-white">White</span>
+            <span class="acpl" id="acpl-white"></span>
+          </div>
+          <span class="accuracy is-empty" id="acc-white"></span>
+        </div>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div class="movelist-wrap">
+        <table class="movelist">
+          <tbody id="movelist-body"></tbody>
+        </table>
+      </div>
+    </aside>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
