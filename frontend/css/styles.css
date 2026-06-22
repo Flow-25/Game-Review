@@ -25,12 +25,14 @@
   --accent-glow: 0 6px 20px -6px rgba(124, 140, 255, .6);
 
   /* classification palette (mirrored in js/app.js) */
+  --c-genius:     #f25cff;
   --c-brilliant:  #2bd4b5;
   --c-great:      #4f9bff;
   --c-best:       #8bc34a;
   --c-excellent:  #9ccc55;
   --c-good:       #aab3c2;
   --c-book:       #c39a6b;
+  --c-missed:     #ffd633;
   --c-inaccuracy: #f4c542;
   --c-mistake:    #ef9036;
   --c-blunder:    #f4503c;
@@ -295,16 +297,20 @@ body {
   font-size: .68rem; font-weight: 800; color: #14160f; flex: none;
   box-shadow: var(--shadow-sm);
 }
+.badge[data-c="Genius"]     { background: var(--c-genius);     color:#2c0631; }
 .badge[data-c="Brilliant"]  { background: var(--c-brilliant);  color:#062a23; }
 .badge[data-c="Great"]      { background: var(--c-great);      color:#06203f; }
 .badge[data-c="Best"]       { background: var(--c-best);       color:#10220a; }
 .badge[data-c="Excellent"]  { background: var(--c-excellent);  color:#10220a; }
 .badge[data-c="Good"]       { background: var(--c-good);       color:#171c24; }
 .badge[data-c="Book"]       { background: var(--c-book);       color:#1c130a; }
+.badge[data-c="Missed"]     { background: var(--c-missed);     color:#2a2206; }
 .badge[data-c="Inaccuracy"] { background: var(--c-inaccuracy); color:#2a2206; }
 .badge[data-c="Mistake"]    { background: var(--c-mistake);    color:#2a1806; }
 .badge[data-c="Blunder"]    { background: var(--c-blunder);    color:#2a0603; }
 .ply.active .badge { box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+/* the triple-mark "!!!" needs tighter tracking to fit the round badge */
+.badge[data-c="Genius"], .review-badge[data-c="Genius"] { letter-spacing: -.08em; }
 /* icon glyphs (e.g. the Book icon) scale with the badge */
 .badge svg, .review-badge svg { width: 70%; height: 70%; display: block; }
 
@@ -316,12 +322,14 @@ body {
 
 /* translucent square highlight on moved piece's from/to squares */
 .sqhl { opacity: .5; }
+.cue-genius     { fill: var(--c-genius); }
 .cue-brilliant  { fill: var(--c-brilliant); }
 .cue-great      { fill: var(--c-great); }
 .cue-best       { fill: var(--c-best); }
 .cue-excellent  { fill: var(--c-excellent); }
 .cue-good       { fill: var(--c-good); }
 .cue-book       { fill: var(--c-book); }
+.cue-missed     { fill: var(--c-missed); }
 .cue-inaccuracy { fill: var(--c-inaccuracy); }
 .cue-mistake    { fill: var(--c-mistake); }
 .cue-blunder    { fill: var(--c-blunder); }
@@ -334,12 +342,14 @@ body {
   box-shadow: 0 2px 6px rgba(0,0,0,.6);
   transition: left .15s ease, top .15s ease; user-select: none;
 }
+.review-badge[data-c="Genius"]     { background: var(--c-genius);     color:#2c0631; }
 .review-badge[data-c="Brilliant"]  { background: var(--c-brilliant);  color:#062a23; }
 .review-badge[data-c="Great"]      { background: var(--c-great);      color:#fff; }
 .review-badge[data-c="Best"]       { background: var(--c-best);       color:#10220a; }
 .review-badge[data-c="Excellent"]  { background: var(--c-excellent);  color:#10220a; }
 .review-badge[data-c="Good"]       { background: var(--c-good);       color:#171c24; }
 .review-badge[data-c="Book"]       { background: var(--c-book);       color:#1c130a; }
+.review-badge[data-c="Missed"]     { background: var(--c-missed);     color:#2a2206; }
 .review-badge[data-c="Inaccuracy"] { background: var(--c-inaccuracy); color:#2a2206; }
 .review-badge[data-c="Mistake"]    { background: var(--c-mistake);    color:#2a1806; }
 .review-badge[data-c="Blunder"]    { background: var(--c-blunder);    color:#fff; }
@@ -376,3 +386,103 @@ body {
 @keyframes sheen { to { transform: translateX(100%); } }
 
 .hidden { display: none; }
+
+/* ---------------- famous-games library (modal) ---------------- */
+.library {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 5vh 1.25rem; overflow-y: auto;
+  background: rgba(6, 8, 14, .72); backdrop-filter: blur(6px);
+}
+.library.hidden { display: none; }          /* keep hiding even though .library sets flex */
+.library__panel {
+  width: min(1040px, 100%);
+  background: linear-gradient(160deg, var(--panel), var(--panel-2));
+  border: 1px solid var(--line-2); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg); overflow: hidden;
+}
+.library__head {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--line);
+}
+.library__title { margin: 0; font-size: 1.15rem; font-weight: 800; }
+.library__sub { margin: .2rem 0 0; color: var(--text-dim); font-size: .85rem; }
+.library__head .btn { margin-left: auto; }
+.library__grid {
+  display: grid; gap: .9rem; padding: 1.2rem 1.4rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+.lib-card {
+  display: flex; flex-direction: column; gap: .35rem; text-align: left;
+  padding: .9rem 1rem; cursor: pointer;
+  background: var(--panel-3); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--r);
+  transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+.lib-card:hover {
+  transform: translateY(-3px); border-color: var(--accent);
+  box-shadow: var(--accent-glow);
+}
+.lib-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lib-card__title { font-weight: 800; font-size: 1rem; color: var(--text); }
+.lib-card__players { font-size: .9rem; font-weight: 600; }
+.lib-card__players .vs { color: var(--text-faint); font-weight: 500; margin: 0 .15rem; }
+.lib-card__meta { font-size: .78rem; color: var(--text-faint); }
+.lib-card__opening {
+  font-size: .76rem; color: var(--accent-2); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lib-card__desc {
+  font-size: .8rem; color: var(--text-dim); line-height: 1.35; margin-top: .15rem;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.lib-card__foot {
+  display: flex; align-items: center; gap: .4rem; margin-top: auto; padding-top: .5rem;
+}
+.lib-card__count { font-size: .72rem; color: var(--text-faint); }
+.lib-acc {
+  font-size: .74rem; font-weight: 700; padding: .12rem .4rem; border-radius: 999px;
+  background: var(--panel-hi); color: var(--text);
+}
+.lib-acc[data-tier="hi"]  { background: rgba(43, 212, 181, .18); color: #58e6cb; }
+.lib-acc[data-tier="mid"] { background: rgba(244, 197, 66, .18); color: #f4c542; }
+.lib-acc[data-tier="low"] { background: rgba(244, 80, 60, .18);  color: #ff7565; }
+
+/* --- Accounts ----------------------------------------------------------- */
+.topbar__sep {
+  width: 1px; align-self: stretch; margin: .25rem .25rem;
+  background: var(--line-2);
+}
+#open-account { font-weight: 600; }
+
+/* saved-game card (a div, not a button — has a delete control) */
+.lib-card--saved { position: relative; }
+.lib-card__del {
+  position: absolute; top: .45rem; right: .45rem;
+  width: 1.5rem; height: 1.5rem; line-height: 1; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--text-faint); font-size: .85rem;
+  opacity: 0; transition: opacity .12s ease, background .12s ease, color .12s ease;
+}
+.lib-card--saved:hover .lib-card__del { opacity: 1; }
+.lib-card__del:hover { background: rgba(244, 80, 60, .18); color: #ff7565; }
+
+/* auth modal */
+.auth__panel { width: min(420px, 100%); }
+.auth__form { display: flex; flex-direction: column; gap: .9rem; padding: 1.3rem 1.4rem; }
+.auth__field { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; color: var(--text-dim); }
+.auth__field input {
+  padding: .6rem .7rem; border-radius: var(--r);
+  background: var(--panel-3); border: 1px solid var(--line); color: var(--text);
+  font-size: .95rem;
+}
+.auth__field input:focus { outline: none; border-color: var(--accent); box-shadow: var(--accent-glow); }
+.auth__error { color: var(--c-blunder); font-size: .82rem; min-height: 1.1em; }
+.auth__error:empty { display: none; }
+.auth__toggle { margin: 0; text-align: center; font-size: .82rem; color: var(--text-dim); }
+.linkbtn {
+  background: none; border: none; cursor: pointer; padding: 0 .25rem;
+  color: var(--accent); font: inherit; font-weight: 600;
+}
+.linkbtn:hover { text-decoration: underline; }

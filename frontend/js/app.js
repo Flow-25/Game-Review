@@ -1,6 +1,11 @@
 // App orchestration: analyze → load game → navigate moves with cues + eval bar.
 
-import { getApiBase, setApiBase, analyze, getGame, getMove, getProgress, evaluate } from "./api.js";
+import {
+  getApiBase, setApiBase, analyze, getGame, getMove, getProgress, evaluate,
+  getLibrary, loadLibraryGame,
+  getToken, setToken, registerAccount, loginAccount, logoutAccount, getMe,
+  getSavedGames, saveGame, loadSavedGame, deleteSavedGame,
+} from "./api.js";
 import { ReviewBoard, FEN, BOOK_ICON_SVG } from "./board.js";
 import { Chess } from "chess.js";
 
@@ -13,8 +18,8 @@ const SAMPLE_PGN = `[White "Paul Morphy"]
 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8# 1-0`;
 
 const BADGE = {
-  Brilliant: "!!", Great: "!", Best: "★", Excellent: "✓", Good: "✓",
-  Book: "▦", Inaccuracy: "?!", Mistake: "?", Blunder: "??",
+  Genius: "!!!", Brilliant: "!!", Great: "!", Best: "★", Excellent: "✓", Good: "✓",
+  Book: "▦", Missed: "−", Inaccuracy: "?!", Mistake: "?", Blunder: "??",
 };
 
 // ---- state ----------------------------------------------------------------
@@ -48,6 +53,14 @@ const els = {
   anBar: $("analysis-bar"), anTurn: $("analysis-turn"),
   anLines: $("analysis-lines"), anFen: $("an-fen"),
   progress: $("progress"), progressFill: $("progress-fill"),
+  libModal: $("library-modal"), libGrid: $("library-grid"),
+  // accounts
+  saveBtn: $("save-game"), myGamesBtn: $("open-mygames"), accountBtn: $("open-account"),
+  acctModal: $("account-modal"), acctClose: $("account-close"),
+  authForm: $("auth-form"), authTitle: $("auth-title"), authUser: $("auth-username"),
+  authPass: $("auth-password"), authError: $("auth-error"), authSubmit: $("auth-submit"),
+  authToggle: $("auth-toggle"), authToggleText: $("auth-toggle-text"),
+  myGamesModal: $("mygames-modal"), myGamesClose: $("mygames-close"), myGamesGrid: $("mygames-grid"),
 };
 
 // ---- helpers --------------------------------------------------------------
@@ -148,7 +161,7 @@ function renderMoveInfo(m) {
   let sub = `${side}`;
   if (m.best_move?.san && m.best_move.san !== m.san) sub += ` • best was <b>${m.best_move.san}</b>`;
   if (m.centipawn_loss > 0) sub += ` • lost ${(m.centipawn_loss / 100).toFixed(2)}`;
-  if (m.classification === "Brilliant" && m.sacrificed_cp) sub += ` • sacrificed ~${(m.sacrificed_cp / 100).toFixed(1)}`;
+  if ((m.classification === "Brilliant" || m.classification === "Genius") && m.sacrificed_cp) sub += ` • sacrificed ~${(m.sacrificed_cp / 100).toFixed(1)}`;
   wrap.innerHTML = `<div class="mi-text">${main}</div><div class="mi-sub">${sub}</div>`;
   els.moveInfo.appendChild(wrap);
 }
@@ -317,6 +330,245 @@ function pollProgress() {
   });
 }
 
+// Populate the whole UI from a /game payload (shared by review + library load).
+async function applyLoadedGame(g) {
+  state.game = g;
+  state.moveCache.clear();
+  state.startFen = (await fetchMove(0)).fen_before;
+
+  els.nameW.textContent = g.white || "White";
+  els.nameB.textContent = g.black || "Black";
+  setAccuracy(els.accW, els.acplW, g.summary.white.avg_centipawn_loss);
+  setAccuracy(els.accB, els.acplB, g.summary.black.avg_centipawn_loss);
+
+  buildMoveList();
+  const op = g.opening ? `${g.opening.eco} · ${g.opening.name}` : "Unknown opening";
+  setStatus(`♟ ${op}  —  ${g.engine_name} • ${g.move_count} moves`);
+  await gotoPly(0);
+}
+
+// ---- famous-games library -------------------------------------------------
+const accTier = (a) => (a >= 80 ? "hi" : a >= 60 ? "mid" : "low");
+
+function libraryCard(g) {
+  const card = document.createElement("button");
+  card.className = "lib-card";
+  card.type = "button";
+  const opening = g.opening ? g.opening.name : "—";
+  card.innerHTML =
+    `<div class="lib-card__title">${g.nickname}</div>` +
+    `<div class="lib-card__players">${g.white} <span class="vs">vs</span> ${g.black}</div>` +
+    `<div class="lib-card__meta">${g.event} · ${g.year} · ${g.result}</div>` +
+    `<div class="lib-card__opening">${opening}</div>` +
+    `<div class="lib-card__desc">${g.description}</div>` +
+    `<div class="lib-card__foot">` +
+      `<span class="lib-acc" data-tier="${accTier(g.accuracy_white)}">♔ ${g.accuracy_white}%</span>` +
+      `<span class="lib-acc" data-tier="${accTier(g.accuracy_black)}">♚ ${g.accuracy_black}%</span>` +
+      `<span class="grow"></span><span class="lib-card__count">${g.move_count} moves</span>` +
+    `</div>`;
+  card.addEventListener("click", () => loadLibrary(g.id));
+  return card;
+}
+
+let libLoaded = false;
+async function openLibrary() {
+  els.libModal.classList.remove("hidden");
+  if (libLoaded) return;                          // already populated — keep cards
+  els.libGrid.innerHTML = '<p class="library__sub">Loading…</p>';
+  try {
+    const { games } = await getLibrary();
+    els.libGrid.innerHTML = "";
+    if (!games.length) { els.libGrid.innerHTML = '<p class="library__sub">No games found — run <code>python -m backend.build_library</code>.</p>'; return; }
+    games.forEach((g) => els.libGrid.appendChild(libraryCard(g)));
+    libLoaded = true;
+  } catch (err) {
+    els.libGrid.innerHTML = `<p class="library__sub">Could not load library: ${err.message}</p>`;
+  }
+}
+
+function closeLibrary() { els.libModal.classList.add("hidden"); }
+
+async function loadLibrary(id) {
+  if (state.busy) return;
+  if (state.mode === "analysis") exitAnalysis();
+  state.busy = true;
+  setStatus("Loading game…");
+  try {
+    const g = await loadLibraryGame(id);   // server-side becomes the active game
+    await applyLoadedGame(g);
+    closeLibrary();
+    els.drawer.classList.add("hidden");
+  } catch (err) {
+    setStatus(err.message, true);
+  } finally {
+    state.busy = false;
+  }
+}
+
+// ---- accounts -------------------------------------------------------------
+let currentUser = null;
+let authMode = "login";   // "login" | "register"
+
+function setAuthUI() {
+  if (currentUser) {
+    els.accountBtn.textContent = `👤 ${currentUser}`;
+    els.accountBtn.title = "Sign out";
+    els.saveBtn.hidden = false;
+    els.myGamesBtn.hidden = false;
+  } else {
+    els.accountBtn.textContent = "👤 Sign in";
+    els.accountBtn.title = "Sign in / create account";
+    els.saveBtn.hidden = true;
+    els.myGamesBtn.hidden = true;
+  }
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const register = mode === "register";
+  els.authTitle.textContent = register ? "Create account" : "Sign in";
+  els.authSubmit.textContent = register ? "Create account" : "Sign in";
+  els.authToggleText.textContent = register ? "Already have an account?" : "Need an account?";
+  els.authToggle.textContent = register ? "Sign in" : "Create one";
+  els.authPass.autocomplete = register ? "new-password" : "current-password";
+  els.authError.textContent = "";
+}
+
+function openAccount() {
+  setAuthMode("login");
+  els.authError.textContent = "";
+  els.acctModal.classList.remove("hidden");
+  els.authUser.focus();
+}
+
+function closeAccount() { els.acctModal.classList.add("hidden"); }
+
+async function submitAuth(e) {
+  e.preventDefault();
+  const username = els.authUser.value.trim();
+  const password = els.authPass.value;
+  els.authError.textContent = "";
+  els.authSubmit.disabled = true;
+  try {
+    const fn = authMode === "register" ? registerAccount : loginAccount;
+    const { token, username: who } = await fn(username, password);
+    setToken(token);
+    currentUser = who;
+    setAuthUI();
+    closeAccount();
+    els.authForm.reset();
+    setStatus(`Signed in as ${who}.`);
+  } catch (err) {
+    els.authError.textContent = err.message.replace(/^\d+:\s*/, "");
+  } finally {
+    els.authSubmit.disabled = false;
+  }
+}
+
+async function signOut() {
+  try { await logoutAccount(); } catch (_) { /* token may already be gone */ }
+  setToken("");
+  currentUser = null;
+  setAuthUI();
+  setStatus("Signed out.");
+}
+
+async function refreshAuth() {
+  setAuthUI();
+  if (!getToken()) return;
+  try {
+    const { username } = await getMe();
+    currentUser = username;
+  } catch (_) {
+    setToken("");          // stale/expired token (e.g. server restarted)
+    currentUser = null;
+  }
+  setAuthUI();
+}
+
+async function doSaveGame() {
+  if (!currentUser) { openAccount(); return; }
+  if (!state.game) { setStatus("Analyze or open a game first.", true); return; }
+  const suggested = `${state.game.white || "White"} vs ${state.game.black || "Black"}`;
+  const name = window.prompt("Save game as:", suggested);
+  if (name === null) return;                 // cancelled
+  try {
+    const { saved } = await saveGame(name.trim());
+    setStatus(`Saved “${saved.name}” to your games.`);
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+}
+
+function savedGameCard(g) {
+  const card = document.createElement("div");
+  card.className = "lib-card lib-card--saved";
+  const opening = g.opening ? g.opening.name : "—";
+  const when = g.saved_at ? new Date(g.saved_at * 1000).toLocaleDateString() : "";
+  card.innerHTML =
+    `<button class="lib-card__del" type="button" title="Delete" aria-label="Delete">✕</button>` +
+    `<div class="lib-card__title">${g.name}</div>` +
+    `<div class="lib-card__players">${g.white} <span class="vs">vs</span> ${g.black}</div>` +
+    `<div class="lib-card__meta">${g.result} · ${opening}${when ? " · saved " + when : ""}</div>` +
+    `<div class="lib-card__foot">` +
+      `<span class="lib-acc" data-tier="${accTier(g.accuracy_white)}">♔ ${g.accuracy_white}%</span>` +
+      `<span class="lib-acc" data-tier="${accTier(g.accuracy_black)}">♚ ${g.accuracy_black}%</span>` +
+      `<span class="grow"></span><span class="lib-card__count">${g.move_count} moves</span>` +
+    `</div>`;
+  card.querySelector(".lib-card__del").addEventListener("click", (e) => {
+    e.stopPropagation();
+    deleteMyGame(g.id, g.name);
+  });
+  card.addEventListener("click", () => loadMyGame(g.id));
+  return card;
+}
+
+async function openMyGames() {
+  if (!currentUser) { openAccount(); return; }
+  els.myGamesModal.classList.remove("hidden");
+  els.myGamesGrid.innerHTML = '<p class="library__sub">Loading…</p>';
+  try {
+    const { games } = await getSavedGames();
+    els.myGamesGrid.innerHTML = "";
+    if (!games.length) {
+      els.myGamesGrid.innerHTML = '<p class="library__sub">No saved games yet — open a game and hit 💾 Save.</p>';
+      return;
+    }
+    games.forEach((g) => els.myGamesGrid.appendChild(savedGameCard(g)));
+  } catch (err) {
+    els.myGamesGrid.innerHTML = `<p class="library__sub">Could not load your games: ${err.message}</p>`;
+  }
+}
+
+function closeMyGames() { els.myGamesModal.classList.add("hidden"); }
+
+async function loadMyGame(id) {
+  if (state.busy) return;
+  if (state.mode === "analysis") exitAnalysis();
+  state.busy = true;
+  setStatus("Loading game…");
+  try {
+    const g = await loadSavedGame(id);
+    await applyLoadedGame(g);
+    closeMyGames();
+    els.drawer.classList.add("hidden");
+  } catch (err) {
+    setStatus(err.message, true);
+  } finally {
+    state.busy = false;
+  }
+}
+
+async function deleteMyGame(id, name) {
+  if (!window.confirm(`Delete “${name}”? This can't be undone.`)) return;
+  try {
+    await deleteSavedGame(id);
+    openMyGames();              // refresh the list
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+}
+
 async function runAnalysis() {
   if (state.busy) return;                       // ignore double-clicks
   const pgn = els.pgn.value.trim();
@@ -333,20 +585,8 @@ async function runAnalysis() {
     });
     await pollProgress();                        // wait for the engine to finish
 
-    const g = (state.game = await getGame());
-    state.moveCache.clear();
-    state.startFen = (await fetchMove(0)).fen_before;
-
-    els.nameW.textContent = g.white || "White";
-    els.nameB.textContent = g.black || "Black";
-    setAccuracy(els.accW, els.acplW, g.summary.white.avg_centipawn_loss);
-    setAccuracy(els.accB, els.acplB, g.summary.black.avg_centipawn_loss);
-
-    buildMoveList();
+    await applyLoadedGame(await getGame());
     els.drawer.classList.add("hidden");
-    const op = g.opening ? `${g.opening.eco} · ${g.opening.name}` : "Unknown opening";
-    setStatus(`♟ ${op}  —  ${g.engine_name} • ${g.move_count} moves`);
-    await gotoPly(0);
   } catch (err) {
     setStatus(err.message, true);
   } finally {
@@ -362,6 +602,20 @@ function wire() {
 
   $("analyze").addEventListener("click", runAnalysis);
   $("analyze-2").addEventListener("click", runAnalysis);
+  $("open-library").addEventListener("click", openLibrary);
+  $("library-close").addEventListener("click", closeLibrary);
+  els.libModal.addEventListener("click", (e) => { if (e.target === els.libModal) closeLibrary(); });
+
+  // Accounts
+  els.accountBtn.addEventListener("click", () => (currentUser ? signOut() : openAccount()));
+  els.acctClose.addEventListener("click", closeAccount);
+  els.acctModal.addEventListener("click", (e) => { if (e.target === els.acctModal) closeAccount(); });
+  els.authForm.addEventListener("submit", submitAuth);
+  els.authToggle.addEventListener("click", () => setAuthMode(authMode === "login" ? "register" : "login"));
+  els.saveBtn.addEventListener("click", doSaveGame);
+  els.myGamesBtn.addEventListener("click", openMyGames);
+  els.myGamesClose.addEventListener("click", closeMyGames);
+  els.myGamesModal.addEventListener("click", (e) => { if (e.target === els.myGamesModal) closeMyGames(); });
   $("open-pgn").addEventListener("click", () => els.drawer.classList.toggle("hidden"));
   $("load-sample").addEventListener("click", () => {
     els.pgn.value = SAMPLE_PGN;
@@ -384,6 +638,11 @@ function wire() {
 
   // Keyboard navigation
   window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (!els.libModal.classList.contains("hidden")) { closeLibrary(); return; }
+      if (!els.acctModal.classList.contains("hidden")) { closeAccount(); return; }
+      if (!els.myGamesModal.classList.contains("hidden")) { closeMyGames(); return; }
+    }
     if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
     if (state.mode === "analysis") {       // analysis: ← takes back, no review nav
       if (e.key === "ArrowLeft") { e.preventDefault(); analysisUndo(); }
@@ -416,3 +675,4 @@ board = new ReviewBoard(
 );
 wire();
 setEvalBar(null);
+refreshAuth();

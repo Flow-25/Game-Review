@@ -91,6 +91,12 @@ class ClassificationThresholds:
     mistake: int = 300
     # anything worse than `mistake` is a Blunder
 
+    # "Missed": a move that *would* be an error (Inaccuracy/Mistake/Blunder) but
+    # still leaves the mover clearly winning is not a true blunder — they merely
+    # missed a bigger advantage. If the eval AFTER the move is still at least
+    # this many centipawns in the mover's favour, it's flagged "Missed" instead.
+    still_winning_cp: int = 300
+
     # "Great" / only-move: a move counts as Great when the player finds the one
     # move that holds — i.e. the engine's best is at least this many centipawns
     # better than its second-best, and the player actually played a top move.
@@ -100,14 +106,21 @@ class ClassificationThresholds:
     # Great find. (This also excludes forced-mate sequences.)
     only_move_max_eval: int = 600
 
+    # "Genius" ("!!!"): a Brilliant move (sound sacrifice) that is ALSO the single
+    # move keeping a significant advantage — the best move stays at least this many
+    # centipawns ahead while every alternative drops below it. The pinnacle move.
+    genius_min_advantage: int = 100
+
     labels: tuple[str, ...] = field(
         default_factory=lambda: (
+            "Genius",      # a Brilliant move that is also the only move keeping the advantage ("!!!")
             "Brilliant",   # a sound sacrifice (detected separately, see brilliancy.py)
             "Great",       # the only good move in the position ("!")
             "Book",
             "Best",
             "Excellent",
             "Good",
+            "Missed",      # a bad move that still keeps a winning position ("−")
             "Inaccuracy",
             "Mistake",
             "Blunder",

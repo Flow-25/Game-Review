@@ -22,10 +22,12 @@ export const BOOK_ICON_SVG =
 
 // Glyph shown in the corner badge per classification.
 const GLYPH = {
-  Brilliant: "!!", Great: "!", Best: "★", Excellent: "✓", Good: "✓",
-  Book: "▦", Inaccuracy: "?!", Mistake: "?", Blunder: "??",
+  Genius: "!!!", Brilliant: "!!", Great: "!", Best: "★", Excellent: "✓", Good: "✓",
+  Book: "▦", Missed: "−", Inaccuracy: "?!", Mistake: "?", Blunder: "??",
 };
-const ERROR_CLASSES = new Set(["Inaccuracy", "Mistake", "Blunder"]);
+// Classes for which we draw the engine's preferred move as an arrow. "Missed"
+// is included: showing the move that kept the bigger advantage is the point.
+const ERROR_CLASSES = new Set(["Missed", "Inaccuracy", "Mistake", "Blunder"]);
 
 // Custom cue types — only `class` is read from the arrow type; the shaft/head
 // geometry comes from the extension. Colour both parts via CSS (.arrow-best).

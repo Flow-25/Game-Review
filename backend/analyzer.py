@@ -150,6 +150,17 @@ def analyse_game(
             and abs(best_eval) <= thresholds.only_move_max_eval
         )
 
+        # "Only move keeping a significant advantage": the best move stays clearly
+        # ahead while every alternative drops below the advantage line. Combined
+        # with a Brilliant sacrifice below, this elevates the move to "Genius".
+        is_only_winning_move = (
+            legal_count > 1
+            and second_eval is not None
+            and best_eval >= thresholds.genius_min_advantage
+            and second_eval < thresholds.genius_min_advantage
+            and (best_eval - second_eval) >= thresholds.only_move_gap
+        )
+
         # Record the played move in SAN *before* pushing it (SAN needs context).
         san = board.san(move)
         uci = move.uci()
@@ -187,18 +198,29 @@ def analyse_game(
                 engine, board_before, board, move, cpl, config=brilliant_config
             )
             if result.is_brilliant:
-                label = "Brilliant"
+                # A Brilliant sacrifice that is also the only move keeping the
+                # advantage is the rarest, strongest call: "Genius" ("!!!").
+                label = "Genius" if is_only_winning_move else "Brilliant"
                 sacrificed_cp = result.sacrificed_cp
 
         # 5) Great move: found the single move that holds. Doesn't override a
         #    Brilliant, and only applies when the player actually played a top
         #    move (small loss) outside of book.
         if (
-            label not in ("Brilliant", "Book")
+            label not in ("Genius", "Brilliant", "Book")
             and is_only_move
             and cpl <= thresholds.excellent
         ):
             label = "Great"
+
+        # 6) Missed (win): a move bad enough to be an error, but which still
+        #    leaves the mover clearly winning, is a "Missed" rather than a true
+        #    blunder — you only threw away a *bigger* advantage, not the game.
+        if (
+            label in ("Inaccuracy", "Mistake", "Blunder")
+            and actual_eval >= thresholds.still_winning_cp
+        ):
+            label = "Missed"
 
         reviews.append(
             MoveReview(
@@ -223,7 +245,11 @@ def analyse_game(
         )
 
         if progress:
-            marker = "  <<< BRILLIANT (!!)" if label == "Brilliant" else ""
+            marker = (
+                "  <<< GENIUS (!!!)" if label == "Genius"
+                else "  <<< BRILLIANT (!!)" if label == "Brilliant"
+                else ""
+            )
             print(
                 f"  [{ply:>3}/{total_plies}] "
                 f"{reviews[-1].color:>5} {san:<7} "

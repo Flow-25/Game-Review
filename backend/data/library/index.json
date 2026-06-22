@@ -1,0 +1,364 @@
+{
+  "games": [
+    {
+      "id": "opera-game-1858",
+      "white": "Paul Morphy",
+      "black": "Duke Karl / Count Isouard",
+      "result": "1-0",
+      "nickname": "The Opera Game",
+      "event": "Paris Opera",
+      "year": 1858,
+      "description": "Morphy's immortal miniature, played in a box at the opera \u2014 rapid development and a clean queen-sacrifice mate.",
+      "opening": {
+        "eco": "C41",
+        "name": "Philidor Defense",
+        "ply": 5
+      },
+      "move_count": 33,
+      "accuracy_white": 99.7,
+      "accuracy_black": 65.4
+    },
+    {
+      "id": "immortal-game-1851",
+      "white": "Adolf Anderssen",
+      "black": "Lionel Kieseritzky",
+      "result": "1-0",
+      "nickname": "The Immortal Game",
+      "event": "London",
+      "year": 1851,
+      "description": "Anderssen sacrifices a bishop, both rooks and the queen to deliver mate with three minor pieces.",
+      "opening": {
+        "eco": "C33",
+        "name": "King's Gambit Accepted: Bishop's Gambit, Bryan Countergambit",
+        "ply": 8
+      },
+      "move_count": 45,
+      "accuracy_white": 98.3,
+      "accuracy_black": 75.7
+    },
+    {
+      "id": "evergreen-game-1852",
+      "white": "Adolf Anderssen",
+      "black": "Jean Dufresne",
+      "result": "1-0",
+      "nickname": "The Evergreen Game",
+      "event": "Berlin",
+      "year": 1852,
+      "description": "Anderssen's 'evergreen' brilliancy, crowned by a famous queen sacrifice and a bishop-and-rook mating net.",
+      "opening": {
+        "eco": "C52",
+        "name": "Italian Game: Evans Gambit, Dufresne Defense",
+        "ply": 14
+      },
+      "move_count": 47,
+      "accuracy_white": 98.9,
+      "accuracy_black": 76.9
+    },
+    {
+      "id": "game-of-the-century-1956",
+      "white": "Donald Byrne",
+      "black": "Robert James Fischer",
+      "result": "0-1",
+      "nickname": "The Game of the Century",
+      "event": "Rosenwald, New York",
+      "year": 1956,
+      "description": "A 13-year-old Fischer unleashes the stunning ...Be6!! queen offer and a windmill to defeat a leading American master.",
+      "opening": {
+        "eco": "A15",
+        "name": "English Opening: Anglo-Indian Defense, King's Indian Formation",
+        "ply": 4
+      },
+      "move_count": 82,
+      "accuracy_white": 98.8,
+      "accuracy_black": 99.5
+    },
+    {
+      "id": "kasparov-topalov-1999",
+      "white": "Garry Kasparov",
+      "black": "Veselin Topalov",
+      "result": "1-0",
+      "nickname": "Kasparov's Immortal",
+      "event": "Hoogovens, Wijk aan Zee",
+      "year": 1999,
+      "description": "Kasparov's astonishing rook sacrifice on d4 launches a king hunt that drags Topalov's king from a7 to d1.",
+      "opening": {
+        "eco": "B07",
+        "name": "Pirc Defense",
+        "ply": 6
+      },
+      "move_count": 87,
+      "accuracy_white": 99.2,
+      "accuracy_black": 99.2
+    },
+    {
+      "id": "deepblue-kasparov-1997",
+      "white": "Deep Blue",
+      "black": "Garry Kasparov",
+      "result": "1-0",
+      "nickname": "Machine Beats Champion",
+      "event": "IBM Man vs Machine, New York",
+      "year": 1997,
+      "description": "The decisive Game 6: Deep Blue's knight sacrifice on e6 becomes the first match win by a computer over a world champion.",
+      "opening": {
+        "eco": "B17",
+        "name": "Caro-Kann Defense: Karpov Variation, Modern Variation",
+        "ply": 9
+      },
+      "move_count": 37,
+      "accuracy_white": 99.8,
+      "accuracy_black": 98.9
+    },
+    {
+      "id": "fischer-spassky-1972-g6",
+      "white": "Robert James Fischer",
+      "black": "Boris Spassky",
+      "result": "1-0",
+      "nickname": "Fischer's Queen's Gambit",
+      "event": "World Championship, Reykjavik",
+      "year": 1972,
+      "description": "Game 6 of the 1972 match \u2014 Fischer plays 1.c4 and produces a model positional game Spassky reportedly applauded.",
+      "opening": {
+        "eco": "D59",
+        "name": "Queen's Gambit Declined: Tartakower Defense",
+        "ply": 22
+      },
+      "move_count": 81,
+      "accuracy_white": 99.4,
+      "accuracy_black": 98.7
+    },
+    {
+      "id": "rotlewi-rubinstein-1907",
+      "white": "Georg Rotlewi",
+      "black": "Akiba Rubinstein",
+      "result": "0-1",
+      "nickname": "Rubinstein's Immortal",
+      "event": "Lodz",
+      "year": 1907,
+      "description": "Rubinstein's masterpiece ends with a cascade of sacrifices (...Rxc3, ...Rd2, ...Bxe4+, ...Rh3) that cannot be met.",
+      "opening": {
+        "eco": "D32",
+        "name": "Tarrasch Defense: Symmetrical Variation",
+        "ply": 10
+      },
+      "move_count": 50,
+      "accuracy_white": 80.2,
+      "accuracy_black": 99.8
+    },
+    {
+      "id": "botvinnik-capablanca-1938",
+      "white": "Mikhail Botvinnik",
+      "black": "Jose Raul Capablanca",
+      "result": "1-0",
+      "nickname": "Botvinnik's Combination",
+      "event": "AVRO, Netherlands",
+      "year": 1938,
+      "description": "Botvinnik's celebrated 30.Ba3!! and 30...Qxa3 31.Nh5+!! deflection sequence overwhelms a legend.",
+      "opening": {
+        "eco": "E40",
+        "name": "Nimzo-Indian Defense: Rubinstein System",
+        "ply": 7
+      },
+      "move_count": 81,
+      "accuracy_white": 99.6,
+      "accuracy_black": 88.1
+    },
+    {
+      "id": "steinitz-bardeleben-1895",
+      "white": "Wilhelm Steinitz",
+      "black": "Curt von Bardeleben",
+      "result": "1-0",
+      "nickname": "Steinitz's Brilliancy",
+      "event": "Hastings",
+      "year": 1895,
+      "description": "Steinitz keeps his rook en prise for moves on end; von Bardeleben quietly left the hall rather than resign.",
+      "opening": {
+        "eco": "C54",
+        "name": "Italian Game: Giuoco Piano, Greco's Attack",
+        "ply": 13
+      },
+      "move_count": 49,
+      "accuracy_white": 99.5,
+      "accuracy_black": 98.5
+    },
+    {
+      "id": "short-timman-1991",
+      "white": "Nigel Short",
+      "black": "Jan Timman",
+      "result": "1-0",
+      "nickname": "The King Walk",
+      "event": "Tilburg",
+      "year": 1991,
+      "description": "Short marches his king up the board (Kg1-h6!) to set up an unstoppable mate \u2014 one of the most famous king walks ever.",
+      "opening": {
+        "eco": "B04",
+        "name": "Alekhine Defense: Modern Variation, Alburt Variation",
+        "ply": 8
+      },
+      "move_count": 67,
+      "accuracy_white": 99.3,
+      "accuracy_black": 85.2
+    },
+    {
+      "id": "byrne-fischer-1963",
+      "white": "Robert Byrne",
+      "black": "Robert James Fischer",
+      "result": "0-1",
+      "nickname": "Fischer's Other Brilliancy",
+      "event": "US Championship, New York",
+      "year": 1963,
+      "description": "Byrne resigned in a position that looked fine to spectators \u2014 only the grandmasters saw Fischer's crushing finish.",
+      "opening": {
+        "eco": "E60",
+        "name": "King's Indian Defense: Fianchetto Variation, Immediate Fianchetto",
+        "ply": 5
+      },
+      "move_count": 42,
+      "accuracy_white": 98.6,
+      "accuracy_black": 99.7
+    },
+    {
+      "id": "aronian-anand-2013",
+      "white": "Levon Aronian",
+      "black": "Viswanathan Anand",
+      "result": "0-1",
+      "nickname": "Anand's Modern Brilliancy",
+      "event": "Tata Steel, Wijk aan Zee",
+      "year": 2013,
+      "description": "Anand's ...Nde5!! and the quiet ...Be3! produce a 21st-century classic, hailed as one of the best games of the decade.",
+      "opening": {
+        "eco": "D46",
+        "name": "Semi-Slav Defense: Chigorin Defense",
+        "ply": 21
+      },
+      "move_count": 46,
+      "accuracy_white": 98.3,
+      "accuracy_black": 99.8
+    },
+    {
+      "id": "levitsky-marshall-1912",
+      "white": "Stepan Levitsky",
+      "black": "Frank Marshall",
+      "result": "0-1",
+      "nickname": "The Gold Coins Game",
+      "event": "Breslau",
+      "year": 1912,
+      "description": "Marshall's ...Qg3!! \u2014 placing the queen where three pieces can take it \u2014 legendarily drew a shower of gold coins.",
+      "opening": {
+        "eco": "C10",
+        "name": "French Defense: Marshall Gambit",
+        "ply": 6
+      },
+      "move_count": 46,
+      "accuracy_white": 98.2,
+      "accuracy_black": 99.4
+    },
+    {
+      "id": "spassky-bronstein-1960",
+      "white": "Boris Spassky",
+      "black": "David Bronstein",
+      "result": "1-0",
+      "nickname": "The Bond Game",
+      "event": "USSR Championship, Leningrad",
+      "year": 1960,
+      "description": "A King's Gambit fireworks display later recreated on screen in 'From Russia with Love'.",
+      "opening": {
+        "eco": "C36",
+        "name": "King's Gambit Accepted: Modern Defense",
+        "ply": 7
+      },
+      "move_count": 45,
+      "accuracy_white": 99.1,
+      "accuracy_black": 97.7
+    },
+    {
+      "id": "karpov-kasparov-1985-g16",
+      "white": "Anatoly Karpov",
+      "black": "Garry Kasparov",
+      "result": "0-1",
+      "nickname": "The Octopus Knight",
+      "event": "World Championship, Moscow",
+      "year": 1985,
+      "description": "Kasparov's knight lands on d3 and strangles White's position \u2014 a defining game of his rise to the title.",
+      "opening": {
+        "eco": "B44",
+        "name": "Sicilian Defense: Taimanov Variation, Gary Gambit",
+        "ply": 16
+      },
+      "move_count": 80,
+      "accuracy_white": 87.8,
+      "accuracy_black": 99.7
+    },
+    {
+      "id": "paulsen-morphy-1857",
+      "white": "Louis Paulsen",
+      "black": "Paul Morphy",
+      "result": "0-1",
+      "nickname": "Morphy's Queen Sacrifice",
+      "event": "First American Chess Congress, New York",
+      "year": 1857,
+      "description": "Morphy's thunderbolt ...Qxf3!! tears open the white king and is one of the most famous combinations of the romantic era.",
+      "opening": {
+        "eco": "C48",
+        "name": "Four Knights Game: Spanish Variation, Classical Variation",
+        "ply": 8
+      },
+      "move_count": 56,
+      "accuracy_white": 81.1,
+      "accuracy_black": 82.1
+    },
+    {
+      "id": "reti-bogoljubov-1924",
+      "white": "Richard Reti",
+      "black": "Efim Bogoljubov",
+      "result": "1-0",
+      "nickname": "Reti's Bishop Finish",
+      "event": "New York",
+      "year": 1924,
+      "description": "Reti's hypermodern strategy culminates in the elegant 24.Bf7+ and 25.Be8! winning material by force.",
+      "opening": {
+        "eco": "A13",
+        "name": "English Opening: Agincourt Defense, Bogoljubow Defense",
+        "ply": 8
+      },
+      "move_count": 49,
+      "accuracy_white": 99.4,
+      "accuracy_black": 97.5
+    },
+    {
+      "id": "lasker-bauer-1889",
+      "white": "Emanuel Lasker",
+      "black": "Johann Bauer",
+      "result": "1-0",
+      "nickname": "The Double Bishop Sacrifice",
+      "event": "Amsterdam",
+      "year": 1889,
+      "description": "The original double-bishop sacrifice (Bxh7+ then Bxg7) \u2014 a pattern still taught to attackers over a century later.",
+      "opening": {
+        "eco": "A03",
+        "name": "Bird Opening: Dutch Variation",
+        "ply": 2
+      },
+      "move_count": 67,
+      "accuracy_white": 99.1,
+      "accuracy_black": 98.2
+    },
+    {
+      "id": "fischer-myagmarsuren-1967",
+      "white": "Robert James Fischer",
+      "black": "Lhamsuren Myagmarsuren",
+      "result": "1-0",
+      "nickname": "Fischer's King's Indian Attack",
+      "event": "Interzonal, Sousse",
+      "year": 1967,
+      "description": "A textbook King's Indian Attack kingside assault ending with the crisp 31.Qxh7+!! and a forced mate.",
+      "opening": {
+        "eco": "C00",
+        "name": "French Defense: King's Indian Attack",
+        "ply": 3
+      },
+      "move_count": 65,
+      "accuracy_white": 99.4,
+      "accuracy_black": 84.5
+    }
+  ]
+}

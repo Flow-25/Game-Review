@@ -8,6 +8,8 @@ GET  /move/{index}   Full state for one move: FEN, eval, classification, and
                      visual-cue data (a marker square + a best-move arrow).
 POST /evaluate       Evaluate an arbitrary FEN (powers the interactive
                      self-analysis board): eval bar + top engine lines.
+GET  /library        Catalogue of pre-reviewed famous games.
+GET  /library/{id}   Load one stored review as the active game (like /game).
 GET  /                Health check / whether a game is currently loaded.
 
 Run it:
@@ -17,6 +19,8 @@ Run it:
 from __future__ import annotations
 
 import io
+import json
+import os
 import threading
 from dataclasses import replace
 from typing import Optional
@@ -24,10 +28,11 @@ from typing import Optional
 import chess
 import chess.engine
 import chess.pgn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .accounts import STORE, AccountError
 from .analyzer import GameReview, MoveReview, analyse_game
 from .config import DEFAULT_ANALYSIS
 from .engine import StockfishEngine
@@ -116,6 +121,15 @@ class EvaluateRequest(BaseModel):
     multipv: int = Field(3, ge=1, le=5, description="How many candidate lines to return.")
 
 
+class AuthRequest(BaseModel):
+    username: str = Field(..., description="Account username.")
+    password: str = Field(..., description="Account password.")
+
+
+class SaveGameRequest(BaseModel):
+    name: str = Field("", description="Optional label for the saved game.")
+
+
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
@@ -170,6 +184,33 @@ def _require_review() -> GameReview:
     if STATE.review is None:
         raise HTTPException(status_code=404, detail="No game loaded. POST a PGN to /analyze first.")
     return STATE.review
+
+
+def _current_user(authorization: Optional[str]) -> str:
+    """Resolve the signed-in username from an 'Authorization: Bearer <token>' header."""
+    token = ""
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    try:
+        return STORE.user_for_token(token)
+    except AccountError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+
+
+# --------------------------------------------------------------------------- #
+# Pre-reviewed famous-games library (built by backend/build_library.py)
+# --------------------------------------------------------------------------- #
+_LIBRARY_DIR = os.path.join(os.path.dirname(__file__), "data", "library")
+
+
+def _review_from_dict(d: dict) -> GameReview:
+    """Reconstruct a GameReview from a stored library JSON (inverse of to_dict)."""
+    moves = [MoveReview(**m) for m in d["moves"]]
+    return GameReview(
+        white=d["white"], black=d["black"], result=d["result"],
+        engine_name=d["engine_name"], moves=moves,
+        summary=d["summary"], opening=d.get("opening"),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -321,6 +362,32 @@ def get_move(index: int) -> dict:
     }
 
 
+@app.get("/library")
+def list_library() -> dict:
+    """Catalogue of pre-reviewed famous games (built by backend/build_library.py)."""
+    path = os.path.join(_LIBRARY_DIR, "index.json")
+    if not os.path.isfile(path):
+        return {"games": []}
+    with open(path) as fh:
+        return json.load(fh)
+
+
+@app.get("/library/{game_id}")
+def load_library_game(game_id: str) -> dict:
+    """Load a stored review into the active game and return it like GET /game."""
+    # Guard against path traversal — ids are lowercase slug + digits + hyphens.
+    if not game_id.replace("-", "").replace("_", "").isalnum():
+        raise HTTPException(status_code=400, detail="Invalid game id.")
+    path = os.path.join(_LIBRARY_DIR, f"{game_id}.json")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail=f"Unknown library game '{game_id}'.")
+    with open(path) as fh:
+        data = json.load(fh)
+    STATE.review = _review_from_dict(data)
+    STATE.pgn = None
+    return get_game()
+
+
 @app.post("/evaluate")
 def evaluate(req: EvaluateRequest) -> dict:
     """Evaluate any position (for the interactive self-analysis board)."""
@@ -366,3 +433,80 @@ def evaluate(req: EvaluateRequest) -> dict:
         "best_move": best,
         "lines": lines,
     }
+
+
+# --------------------------------------------------------------------------- #
+# User accounts + saved games
+# --------------------------------------------------------------------------- #
+@app.post("/auth/register")
+def auth_register(req: AuthRequest) -> dict:
+    """Create an account and return a session token."""
+    try:
+        token = STORE.register(req.username, req.password)
+    except AccountError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+    return {"token": token, "username": req.username.strip()}
+
+
+@app.post("/auth/login")
+def auth_login(req: AuthRequest) -> dict:
+    """Sign in and return a session token."""
+    try:
+        token = STORE.login(req.username, req.password)
+    except AccountError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+    return {"token": token, "username": STORE.user_for_token(token)}
+
+
+@app.post("/auth/logout")
+def auth_logout(authorization: Optional[str] = Header(None)) -> dict:
+    """Invalidate the current session token."""
+    token = authorization[7:].strip() if authorization and authorization.lower().startswith("bearer ") else ""
+    STORE.logout(token)
+    return {"ok": True}
+
+
+@app.get("/auth/me")
+def auth_me(authorization: Optional[str] = Header(None)) -> dict:
+    """Return the signed-in user (validates the token)."""
+    return {"username": _current_user(authorization)}
+
+
+@app.get("/games")
+def list_games(authorization: Optional[str] = Header(None)) -> dict:
+    """List the signed-in user's saved games (catalogue entries only)."""
+    user = _current_user(authorization)
+    return {"games": STORE.list_games(user)}
+
+
+@app.post("/games")
+def save_game(req: SaveGameRequest, authorization: Optional[str] = Header(None)) -> dict:
+    """Save the currently-loaded review to the signed-in user's collection."""
+    user = _current_user(authorization)
+    review = _require_review()
+    entry = STORE.save_game(user, review.to_dict(), name=req.name)
+    return {"saved": entry}
+
+
+@app.get("/games/{game_id}")
+def load_saved_game(game_id: str, authorization: Optional[str] = Header(None)) -> dict:
+    """Load one of the user's saved games into the active game (like GET /game)."""
+    user = _current_user(authorization)
+    try:
+        data = STORE.get_game(user, game_id)
+    except AccountError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+    STATE.review = _review_from_dict(data)
+    STATE.pgn = None
+    return get_game()
+
+
+@app.delete("/games/{game_id}")
+def delete_saved_game(game_id: str, authorization: Optional[str] = Header(None)) -> dict:
+    """Delete one of the user's saved games."""
+    user = _current_user(authorization)
+    try:
+        STORE.delete_game(user, game_id)
+    except AccountError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+    return {"deleted": game_id}

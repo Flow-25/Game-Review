@@ -14,7 +14,11 @@ venv/
 *.json
 !frontend/**/*.json
 !backend/data/openings.json
+!backend/data/library/*.json
 output/
+
+# Local user accounts + their saved games (private user data)
+backend/data/accounts/
 
 # Bundled engine binary (large; download via README instructions)
 engines/
