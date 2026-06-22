@@ -18,7 +18,7 @@ pieces and see the engine's verdict in real time.
 - **Brilliant move detection** — finds *sound sacrifices* (you give up material but keep the advantage), not just engine-best moves.
 - **Great move detection** — flags the *only* move that holds in a critical position.
 - **Famous-games library** — browse ~20 of the most celebrated games of all time, **already reviewed** and ready to explore instantly (the Immortal, the Opera Game, Fischer's Game of the Century, Kasparov–Topalov, and more).
-- **User accounts** — create a local account to **save your analyzed games** and reopen them any time from your personal collection (passwords are hashed, never stored in plaintext; everything stays on your machine).
+- **Multi-user ready** — several people can share one backend; each browser keeps its own game, and a Stockfish concurrency cap keeps the machine from being overloaded.
 - **Opening detection** — names the opening (ECO code) from a bundled database of 3,700+ lines.
 - **Evaluation bar** — a live gauge of who's winning, with mate detection.
 - **Annotated board** — colored square highlights, corner badges, and a green arrow showing the engine's suggestion when you slip.
@@ -102,24 +102,23 @@ Then open **<http://127.0.0.1:5500>** in your browser. 🎉
    variations and the engine evaluates live, listing its best lines. Paste a
    **FEN** to analyze any position from scratch. **Undo**, **Reset**, or
    **Exit analysis** to return to the review.
-5. Click **👤 Sign in** to create an account or log in. Once signed in, hit
-   **💾 Save** to store the game you're viewing, and **🗂 My games** to reopen or
-   delete anything you've saved. Click your name to sign out.
 
 > **Tip:** higher **Time/move** in the PGN panel gives stronger, more reliable
 > reviews (and better Brilliant/Great detection) — at the cost of longer waits.
 
-### 👥 Accounts
+### 👥 Multiple users
 
-Accounts live entirely on your machine under `backend/data/accounts/`
-(git-ignored). Passwords are hashed with PBKDF2-HMAC-SHA256 — never stored in
-plaintext. To create a few **test accounts** to try the feature:
+Several people can point their browsers at the same backend at once. Each browser
+gets its own private session (an `X-Session-Id` it stores locally), so everyone
+keeps their own loaded game and review progress — no one clobbers anyone else.
+
+To stop a crowd from overloading the machine, the number of Stockfish reviews
+running **at the same time** is capped (default **2**); extra requests queue
+until a slot frees up. Tune it with an environment variable:
 
 ```bash
-python -m backend.accounts seed
+MAX_CONCURRENT_ANALYSES=4 uvicorn backend.api:app --port 8000
 ```
-
-This creates **alice / alice123**, **bob / bob123**, and **carol / carol123**.
 
 ---
 

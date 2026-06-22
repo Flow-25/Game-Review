@@ -39,10 +39,6 @@
       <button id="open-pgn" class="btn btn--ghost" type="button">Paste PGN</button>
       <button id="analyze" class="btn btn--primary" type="button">Analyze</button>
       <button id="analysis-toggle" class="btn" type="button" title="Interactive self-analysis — drag pieces">⚄ Analysis</button>
-      <span class="topbar__sep"></span>
-      <button id="save-game" class="btn btn--ghost" type="button" title="Save this game to your account" hidden>💾 Save</button>
-      <button id="open-mygames" class="btn btn--ghost" type="button" title="Your saved games" hidden>🗂 My games</button>
-      <button id="open-account" class="btn btn--ghost" type="button" title="Sign in / create account">👤 Sign in</button>
     </div>
   </header>
 
@@ -62,47 +58,6 @@
         <button id="library-close" class="btn btn--ghost" type="button" aria-label="Close">✕</button>
       </header>
       <div id="library-grid" class="library__grid"></div>
-    </div>
-  </div>
-
-  <!-- Account: sign in / register -->
-  <div id="account-modal" class="library hidden" role="dialog" aria-label="Account">
-    <div class="library__panel auth__panel">
-      <header class="library__head">
-        <div>
-          <h2 class="library__title">👤 <span id="auth-title">Sign in</span></h2>
-          <p class="library__sub">Create an account to analyze and save your games.</p>
-        </div>
-        <button id="account-close" class="btn btn--ghost" type="button" aria-label="Close">✕</button>
-      </header>
-      <form id="auth-form" class="auth__form">
-        <label class="auth__field">Username
-          <input id="auth-username" autocomplete="username" spellcheck="false" />
-        </label>
-        <label class="auth__field">Password
-          <input id="auth-password" type="password" autocomplete="current-password" />
-        </label>
-        <div id="auth-error" class="auth__error"></div>
-        <button id="auth-submit" class="btn btn--primary" type="submit">Sign in</button>
-        <p class="auth__toggle">
-          <span id="auth-toggle-text">Need an account?</span>
-          <button id="auth-toggle" class="linkbtn" type="button">Create one</button>
-        </p>
-      </form>
-    </div>
-  </div>
-
-  <!-- Saved games -->
-  <div id="mygames-modal" class="library hidden" role="dialog" aria-label="My saved games">
-    <div class="library__panel">
-      <header class="library__head">
-        <div>
-          <h2 class="library__title">🗂 My Games</h2>
-          <p class="library__sub">Your saved reviews — pick one to open.</p>
-        </div>
-        <button id="mygames-close" class="btn btn--ghost" type="button" aria-label="Close">✕</button>
-      </header>
-      <div id="mygames-grid" class="library__grid"></div>
     </div>
   </div>
 

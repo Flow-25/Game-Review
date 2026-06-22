@@ -12,6 +12,13 @@ GET  /library        Catalogue of pre-reviewed famous games.
 GET  /library/{id}   Load one stored review as the active game (like /game).
 GET  /                Health check / whether a game is currently loaded.
 
+Multi-user
+----------
+Several browsers can share one backend. Each sends an opaque ``X-Session-Id``
+header (generated client-side); per-session state keeps each user's loaded game
+and analysis progress separate. A bounded semaphore (MAX_CONCURRENT_ANALYSES)
+caps how many Stockfish reviews run at once so the machine isn't swamped.
+
 Run it:
     uvicorn backend.api:app --reload --port 8000
 """
@@ -22,6 +29,7 @@ import io
 import json
 import os
 import threading
+import time
 from dataclasses import replace
 from typing import Optional
 
@@ -32,7 +40,6 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .accounts import STORE, AccountError
 from .analyzer import GameReview, MoveReview, analyse_game
 from .config import DEFAULT_ANALYSIS
 from .engine import StockfishEngine
@@ -50,30 +57,68 @@ app.add_middleware(
 )
 
 # --------------------------------------------------------------------------- #
-# In-memory store (single current game — this is a local single-user tool)
+# Per-session state (multi-user)
 # --------------------------------------------------------------------------- #
-class _Store:
-    review: Optional[GameReview] = None
-    pgn: Optional[str] = None
-
-
-STATE = _Store()
-
-
+# This is still a small, local tool, but several people can now point their
+# browsers at the same backend. Each browser sends an opaque "X-Session-Id"
+# header (generated client-side, persisted in localStorage); we keep one slice
+# of state per session so users don't clobber each other's loaded game.
 class _Progress:
-    """Live progress of the current /analyze job (single-user tool)."""
-    status: str = "idle"   # idle | running | done | error
-    done: int = 0
-    total: int = 0
-    error: Optional[str] = None
+    """Live progress of one session's /analyze job."""
+    def __init__(self) -> None:
+        self.status: str = "idle"   # idle | queued | running | done | error
+        self.done: int = 0
+        self.total: int = 0
+        self.error: Optional[str] = None
 
 
-PROGRESS = _Progress()
+class Session:
+    """Everything one connected user is currently looking at."""
+    def __init__(self) -> None:
+        self.review: Optional[GameReview] = None
+        self.pgn: Optional[str] = None
+        self.progress = _Progress()
+        self.last_seen = time.time()
+
+
+_DEFAULT_SID = "default"
+_MAX_SESSIONS = 200          # cap memory; least-recently-used sessions are evicted
+_sessions: dict[str, Session] = {}
+_sessions_lock = threading.Lock()
 _progress_lock = threading.Lock()
+
+
+def _get_session(session_id: Optional[str]) -> Session:
+    """Fetch (or lazily create) the Session for an X-Session-Id header value."""
+    sid = (session_id or "").strip() or _DEFAULT_SID
+    now = time.time()
+    with _sessions_lock:
+        sess = _sessions.get(sid)
+        if sess is None:
+            if len(_sessions) >= _MAX_SESSIONS:
+                # Evict the least-recently-seen session to bound memory.
+                oldest = min(_sessions, key=lambda k: _sessions[k].last_seen)
+                del _sessions[oldest]
+            sess = _sessions[sid] = Session()
+        sess.last_seen = now
+        return sess
+
+
+# --------------------------------------------------------------------------- #
+# Stockfish concurrency limit
+# --------------------------------------------------------------------------- #
+# Each /analyze job spawns its own Stockfish process and runs it flat-out for a
+# whole game, so letting every user start one at once would swamp the machine.
+# A bounded semaphore caps how many reviews run engines simultaneously; extra
+# jobs queue (their session shows "queued") until a slot frees up. Tune with the
+# MAX_CONCURRENT_ANALYSES env var.
+MAX_CONCURRENT_ANALYSES = max(1, int(os.environ.get("MAX_CONCURRENT_ANALYSES", "2")))
+_analysis_slots = threading.BoundedSemaphore(MAX_CONCURRENT_ANALYSES)
 
 # A single long-lived engine powers /evaluate so the interactive board feels
 # snappy (no per-request process spawn). python-chess engines are not safe for
-# concurrent use, so a lock serialises analysis calls.
+# concurrent use, so a lock serialises analysis calls (a hard cap of 1 eval at a
+# time, independent of the analysis semaphore above).
 _eval_engine: Optional[StockfishEngine] = None
 _eval_lock = threading.Lock()
 _eval_init_lock = threading.Lock()
@@ -119,15 +164,6 @@ class EvaluateRequest(BaseModel):
     time_per_move: float = Field(0.3, gt=0, le=5, description="Engine time (s).")
     depth: Optional[int] = Field(None, gt=0, le=40, description="Fixed depth (overrides time).")
     multipv: int = Field(3, ge=1, le=5, description="How many candidate lines to return.")
-
-
-class AuthRequest(BaseModel):
-    username: str = Field(..., description="Account username.")
-    password: str = Field(..., description="Account password.")
-
-
-class SaveGameRequest(BaseModel):
-    name: str = Field("", description="Optional label for the saved game.")
 
 
 # --------------------------------------------------------------------------- #
@@ -180,21 +216,10 @@ def _line_payload(board: chess.Board, info: chess.engine.InfoDict) -> Optional[d
     }
 
 
-def _require_review() -> GameReview:
-    if STATE.review is None:
+def _require_review(sess: Session) -> GameReview:
+    if sess.review is None:
         raise HTTPException(status_code=404, detail="No game loaded. POST a PGN to /analyze first.")
-    return STATE.review
-
-
-def _current_user(authorization: Optional[str]) -> str:
-    """Resolve the signed-in username from an 'Authorization: Bearer <token>' header."""
-    token = ""
-    if authorization and authorization.lower().startswith("bearer "):
-        token = authorization[7:].strip()
-    try:
-        return STORE.user_for_token(token)
-    except AccountError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc))
+    return sess.review
 
 
 # --------------------------------------------------------------------------- #
@@ -217,43 +242,56 @@ def _review_from_dict(d: dict) -> GameReview:
 # Endpoints
 # --------------------------------------------------------------------------- #
 @app.get("/")
-def root() -> dict:
-    loaded = STATE.review is not None
+def root(x_session_id: Optional[str] = Header(None)) -> dict:
+    sess = _get_session(x_session_id)
+    loaded = sess.review is not None
     return {
         "status": "ok",
         "game_loaded": loaded,
-        "move_count": len(STATE.review.moves) if loaded else 0,
+        "move_count": len(sess.review.moves) if loaded else 0,
+        "active_sessions": len(_sessions),
+        "max_concurrent_analyses": MAX_CONCURRENT_ANALYSES,
     }
 
 
-def _run_analysis_job(req: AnalyzeRequest) -> None:
-    """Background worker: analyse the game, updating PROGRESS as it goes."""
+def _run_analysis_job(req: AnalyzeRequest, sess: Session) -> None:
+    """Background worker: wait for an engine slot, then analyse the game."""
+    prog = sess.progress
     config = replace(DEFAULT_ANALYSIS, time_per_move=req.time_per_move, depth=req.depth)
 
     def on_progress(done: int, total: int) -> None:
-        PROGRESS.done = done   # plain int assignment is atomic enough for polling
+        prog.done = done   # plain int assignment is atomic enough for polling
 
+    # Block here until a Stockfish slot is free — this caps total engine load
+    # no matter how many users hit Analyze at once.
+    _analysis_slots.acquire()
     try:
+        with _progress_lock:
+            prog.status = "running"
         with StockfishEngine(config=config) as engine:
             review = analyse_game(
                 req.pgn, engine, config=config,
                 detect_brilliancies=req.detect_brilliancies,
                 progress=False, progress_cb=on_progress,
             )
-        STATE.review = review
-        STATE.pgn = req.pgn
+        sess.review = review
+        sess.pgn = req.pgn
         with _progress_lock:
-            PROGRESS.done = PROGRESS.total
-            PROGRESS.status = "done"
+            prog.done = prog.total
+            prog.status = "done"
     except Exception as exc:  # noqa: BLE001 — surface any failure via /progress
         with _progress_lock:
-            PROGRESS.status = "error"
-            PROGRESS.error = str(exc)
+            prog.status = "error"
+            prog.error = str(exc)
+    finally:
+        _analysis_slots.release()
 
 
 @app.post("/analyze")
-def analyze(req: AnalyzeRequest) -> dict:
+def analyze(req: AnalyzeRequest, x_session_id: Optional[str] = Header(None)) -> dict:
     """Kick off a background review of a PGN; poll GET /progress for status."""
+    sess = _get_session(x_session_id)
+
     # Cheap up-front validation so obviously-bad input fails fast with 400.
     game = chess.pgn.read_game(io.StringIO(req.pgn))
     total = sum(1 for _ in game.mainline_moves()) if game else 0
@@ -261,32 +299,35 @@ def analyze(req: AnalyzeRequest) -> dict:
         raise HTTPException(status_code=400, detail="No moves found — the PGN is empty or could not be parsed.")
 
     with _progress_lock:
-        if PROGRESS.status == "running":
-            raise HTTPException(status_code=409, detail="An analysis is already in progress.")
-        PROGRESS.status = "running"
-        PROGRESS.done = 0
-        PROGRESS.total = total
-        PROGRESS.error = None
+        if sess.progress.status in ("queued", "running"):
+            raise HTTPException(status_code=409, detail="An analysis is already in progress for this session.")
+        # "queued" until the job thread acquires a Stockfish slot; it flips to
+        # "running" once the engine actually starts.
+        sess.progress.status = "queued"
+        sess.progress.done = 0
+        sess.progress.total = total
+        sess.progress.error = None
 
-    threading.Thread(target=_run_analysis_job, args=(req,), daemon=True).start()
+    threading.Thread(target=_run_analysis_job, args=(req, sess), daemon=True).start()
     return {"status": "started", "total_plies": total}
 
 
 @app.get("/progress")
-def progress() -> dict:
-    """Live progress of the current/last analysis job (for the progress bar)."""
+def progress(x_session_id: Optional[str] = Header(None)) -> dict:
+    """Live progress of this session's current/last analysis job."""
+    prog = _get_session(x_session_id).progress
     return {
-        "status": PROGRESS.status,
-        "done": PROGRESS.done,
-        "total": PROGRESS.total,
-        "error": PROGRESS.error,
+        "status": prog.status,
+        "done": prog.done,
+        "total": prog.total,
+        "error": prog.error,
     }
 
 
 @app.get("/game")
-def get_game() -> dict:
+def get_game(x_session_id: Optional[str] = Header(None)) -> dict:
     """Return game metadata and a lightweight list of moves."""
-    review = _require_review()
+    review = _require_review(_get_session(x_session_id))
     moves = [
         {
             "index": i,
@@ -312,9 +353,9 @@ def get_game() -> dict:
 
 
 @app.get("/move/{index}")
-def get_move(index: int) -> dict:
+def get_move(index: int, x_session_id: Optional[str] = Header(None)) -> dict:
     """Full per-move state, including visual-cue data for the board overlay."""
-    review = _require_review()
+    review = _require_review(_get_session(x_session_id))
     if index < 0 or index >= len(review.moves):
         raise HTTPException(
             status_code=404,
@@ -373,8 +414,8 @@ def list_library() -> dict:
 
 
 @app.get("/library/{game_id}")
-def load_library_game(game_id: str) -> dict:
-    """Load a stored review into the active game and return it like GET /game."""
+def load_library_game(game_id: str, x_session_id: Optional[str] = Header(None)) -> dict:
+    """Load a stored review into the session's active game and return it like GET /game."""
     # Guard against path traversal — ids are lowercase slug + digits + hyphens.
     if not game_id.replace("-", "").replace("_", "").isalnum():
         raise HTTPException(status_code=400, detail="Invalid game id.")
@@ -383,9 +424,10 @@ def load_library_game(game_id: str) -> dict:
         raise HTTPException(status_code=404, detail=f"Unknown library game '{game_id}'.")
     with open(path) as fh:
         data = json.load(fh)
-    STATE.review = _review_from_dict(data)
-    STATE.pgn = None
-    return get_game()
+    sess = _get_session(x_session_id)
+    sess.review = _review_from_dict(data)
+    sess.pgn = None
+    return get_game(x_session_id)
 
 
 @app.post("/evaluate")
@@ -433,80 +475,3 @@ def evaluate(req: EvaluateRequest) -> dict:
         "best_move": best,
         "lines": lines,
     }
-
-
-# --------------------------------------------------------------------------- #
-# User accounts + saved games
-# --------------------------------------------------------------------------- #
-@app.post("/auth/register")
-def auth_register(req: AuthRequest) -> dict:
-    """Create an account and return a session token."""
-    try:
-        token = STORE.register(req.username, req.password)
-    except AccountError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc))
-    return {"token": token, "username": req.username.strip()}
-
-
-@app.post("/auth/login")
-def auth_login(req: AuthRequest) -> dict:
-    """Sign in and return a session token."""
-    try:
-        token = STORE.login(req.username, req.password)
-    except AccountError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc))
-    return {"token": token, "username": STORE.user_for_token(token)}
-
-
-@app.post("/auth/logout")
-def auth_logout(authorization: Optional[str] = Header(None)) -> dict:
-    """Invalidate the current session token."""
-    token = authorization[7:].strip() if authorization and authorization.lower().startswith("bearer ") else ""
-    STORE.logout(token)
-    return {"ok": True}
-
-
-@app.get("/auth/me")
-def auth_me(authorization: Optional[str] = Header(None)) -> dict:
-    """Return the signed-in user (validates the token)."""
-    return {"username": _current_user(authorization)}
-
-
-@app.get("/games")
-def list_games(authorization: Optional[str] = Header(None)) -> dict:
-    """List the signed-in user's saved games (catalogue entries only)."""
-    user = _current_user(authorization)
-    return {"games": STORE.list_games(user)}
-
-
-@app.post("/games")
-def save_game(req: SaveGameRequest, authorization: Optional[str] = Header(None)) -> dict:
-    """Save the currently-loaded review to the signed-in user's collection."""
-    user = _current_user(authorization)
-    review = _require_review()
-    entry = STORE.save_game(user, review.to_dict(), name=req.name)
-    return {"saved": entry}
-
-
-@app.get("/games/{game_id}")
-def load_saved_game(game_id: str, authorization: Optional[str] = Header(None)) -> dict:
-    """Load one of the user's saved games into the active game (like GET /game)."""
-    user = _current_user(authorization)
-    try:
-        data = STORE.get_game(user, game_id)
-    except AccountError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc))
-    STATE.review = _review_from_dict(data)
-    STATE.pgn = None
-    return get_game()
-
-
-@app.delete("/games/{game_id}")
-def delete_saved_game(game_id: str, authorization: Optional[str] = Header(None)) -> dict:
-    """Delete one of the user's saved games."""
-    user = _current_user(authorization)
-    try:
-        STORE.delete_game(user, game_id)
-    except AccountError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc))
-    return {"deleted": game_id}
